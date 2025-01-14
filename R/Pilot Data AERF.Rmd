@@ -1,0 +1,402 @@
+---
+title: "Pilot Data"
+author: "AERF"
+date: "2024-11-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+n#Libraries
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("dada2", version = "3.20")
+
+library(readxl)
+BiocManager::install("ShortRead")
+BiocManager::install("Biostrings")
+
+library(ShortRead)
+library(Biostrings)
+library(microViz)
+#library(dada2) ; packageVersion('dada2')
+# others
+require(tidyverse)
+require(RColorBrewer)
+suppressWarnings( require(cowplot) )  # suppress the new theme command change
+theme_set(theme_cowplot())            # since version 1.0 explicit setting required
+require(phyloseq)
+require(dada2)
+```
+
+#Custom Color Palette for plots
+```{r}
+
+custom_palette_Anne<-c("aquamarine4","blanchedalmond","burlywood3","cadetblue",
+                  "lightcoral","coral4","darkgoldenrod","darkolivegreen","cornflowerblue",
+                  "lightsalmon3","cyan3","orchid4","darksalmon","darkseagreen",
+                  "darkslateblue","darkslategray3","deeppink3","deepskyblue3","floralwhite",
+                  "slategrey","powderblue","rosybrown","indianred","maroon4","mediumpurple3")
+
+#showCols <- function(cl=colors(), bg = "grey",
+     #                cex = 0.75, rot = 30) {
+    #m <- ceiling(sqrt(n <-length(cl)))
+    #length(cl) <- m*m; cm <- matrix(cl, m)
+    #require("grid")
+    #grid.newpage(); vp <- viewport(w = .96, h = .92)
+    #grid.rect(gp=gpar(fill=bg))
+    #grid.text(cm, x = col(cm)/m, y = rev(row(cm))/m, rot = rot,
+     #         vp=vp, gp=gpar(cex = cex, col = cm))
+  #}
+
+#showCols(bg="gray20",cl=colors()[600:700], rot=30, cex=0.9)
+
+```
+#Load in Data
+```{r}
+Pilot16S<-readRDS("20241018_AR_16S_silva_merged_NAfilled.rds")
+```
+#Phyloseq basics
+```{r}
+## phyloseq-class experiment-level object
+## otu_table()   OTU Table:         [ 19216 taxa and 26 samples ]
+## sample_data() Sample Data:       [ 26 samples by 7 sample variables ]
+## tax_table()   Taxonomy Table:    [ 19216 taxa by 7 taxonomic ranks ]
+## phy_tree()    Phylogenetic Tree: [ 19216 tips and 19215 internal nodes ]
+
+ntaxa(Pilot16S)
+
+nsamples(Pilot16S)
+
+sample_names(Pilot16S)[1:5]
+
+rank_names(Pilot16S)
+
+sample_variables(Pilot16S)
+
+otu_table(Pilot16S)[1:5, 1:5]
+
+#tax_table(Pilot16S)[1:5, 1:4]
+
+#phy_tree(Pilot16S)
+#myTaxa = names(sort(taxa_sums(Pilot16S), decreasing = TRUE)[1:10])
+#ex1 = prune_taxa(myTaxa, Pilot16S)
+#plot(phy_tree(ex1), show.node.label = TRUE)
+```
+#Merge with Metadata
+```{r}
+Pilot16S@sam_data
+sample_names(Pilot16S)
+#renaming samples
+#load metadata file
+metaPilot<-read_excel("NCOH-PP Pilot Sample Master List.xlsx", sheet="Sample Master List")
+
+#remove non sequenced samples
+metaPilot<-subset(metaPilot,metaPilot$Seq_ID!="Not Sequenced")
+
+metaPilot<-as.data.frame(metaPilot)
+
+#check if there are any sample names in the seq object that are not in the metadata
+metaPilot[!metaPilot$`Seq_ID` %in% sample_names(Pilot16S),]
+
+
+rownames(metaPilot) <- metaPilot$`Seq_ID`
+sample_data(Pilot16S) <- metaPilot
+
+```
+#Merge with 16S qPCR
+```{r}
+#Load 16S Data
+qPCR16SPilot<-read_excel("NCOH-PP Pilot Sample Master List.xlsx", sheet="16S qPCR")
+
+#remove non sequenced samples
+qPCR16SPilot<-subset(qPCR16SPilot,qPCR16SPilot$Seq_ID!="Not Sequenced")
+
+#check if there are any sample names in the seq object that are not in the 16S data
+qPCR16SPilot[!qPCR16SPilot$`Seq_ID` %in% sample_names(Pilot16S),]
+
+#add 16S to metadata
+metaPilot$Mean_16S_Ct<-qPCR16SPilot$mean_ct_5x
+
+sample_data(Pilot16S) <- metaPilot
+
+head(Pilot16S@sam_data)
+```
+#Split Data by Sample Type
+###Air
+```{r}
+#Air
+Pilot16S_air <- subset_samples(Pilot16S, Sample_Type %in% c("Air Filter","Air Filter-Blank") )
+
+  
+#plot_bar(Pilot16S_air,fill="Phylum")
+
+#Water
+Pilot16S_water <- subset_samples(Pilot16S, Sample_Type == "Water")
+# |#Air_composition <- create_ordered_bar(subset_samples(Pilot16S, !is.na(population)), "Air Filter", 15) + 
+#   #theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) + 
+#   geom_bar(stat = "identity", width = 1) + 
+#   facet_wrap(~population, scale = "free")
+```
+
+```{r}
+#create realtive abundance object
+
+prevdf_air <- transformSampleCounts(Pilot16S_air,function(x) 1E2* x / sum(x))
+prevdf_water <- transformSampleCounts(Pilot16S_water,function(x) 1E2* x/ sum(x))
+
+```
+
+#Plots
+#Air- Phylum
+```{r}
+prevdf_air_phylum <- tax_glom(prevdf_air,taxrank="Phylum")
+
+plot_df <- psmelt(prevdf_air_phylum)
+plot_df <- plot_df[,c("Abundance","Phylum","Sample_ID")]
+plot_df$Sample_ID <- factor(plot_df$Sample_ID,levels=unique(plot_df$Sample_ID))
+plot_df$Phylum <- factor(plot_df$Phylum,levels=unique(plot_df$Phylum))
+
+top_20_Phyla <- plot_df %>%
+  group_by(Phylum) %>%                        # Group by Genus
+  summarise(Total_Abundance = sum(Abundance, na.rm = TRUE)) %>% # Sum abundance
+  arrange(desc(Total_Abundance)) %>%        # Sort by descending abundance
+  slice_head(n = 20) %>%                    # Select the top 20
+  pull(Phylum)                               # Extract the Genus names
+
+top_20_Phyla
+
+#filtered_df <- plot_df %>%  group_by(Sample_ID) %>%   arrange(desc(Abundance)) %>%    slice_head(n = 20) %>%ungroup()
+
+unique(filtered_df$Phylum)#shows that there are still 42 groups included
+
+ggplot(filtered_df,aes(x = Sample_ID, y = Abundance, fill=(as.character(Phylum))))+ 
+  geom_bar(stat="identity")+
+    guides(fill = guide_legend(ncol = 1))+
+   scale_fill_manual(values = custom_palette_Anne) +
+    labs(title="Top 20 Phyla - Air Samples",fill="Phyla")+
+theme(
+    legend.text = element_text(size = 5),  # Adjusts text size in the legend
+    legend.key.size = unit(0.25, "cm") ) # Adjusts the size of the legend key boxes
+
+```
+#Removing possible contaminate genera
+```{r}
+#Subset field blank samples
+Pilot16S_air <- subset_samples(Pilot16S, Sample_Type %in% c("Air Filter") )
+ntaxa(Pilot16S_air)
+
+prevdf_air <- transformSampleCounts(Pilot16S_air,function(x) 1E2* x / sum(x))
+
+Pilot_air_FieldBlanks<-subset_samples(Pilot16S, Sample_Type == "Air Filter-Blank")
+
+prevdf_air_FieldBlanks <- transformSampleCounts(Pilot_air_FieldBlanks,function(x) 1E2* x / sum(x))
+
+Pilot_air_FieldBlanks
+#Remove zero counts
+ps.r <- transform_sample_counts( Pilot_air_FieldBlanks, function(x) x / sum(x) )
+ps.r_filt<-filter_taxa(ps.r,function(x)mean(x)>0,TRUE)
+ps.r_filt
+BlankTaxa<-taxa_names(ps.r_filt)
+#Remove taxa found in blanks from main samples
+Air_Cleaned<-prune_taxa(!taxa_names(prevdf_air) %in% BlankTaxa,prevdf_air)
+plot_bar(Air_Cleaned, fill="Phylum")
+```
+#Top 25 genera, decontam
+```{r}
+prevdf_air_genus_cleaned <- tax_glom(Air_Cleaned,taxrank="Genus")
+
+plot_df <- psmelt(prevdf_air_genus_cleaned)
+plot_df <- plot_df[,c("Abundance","Genus","Sample_ID")]
+plot_df$Sample_ID <- factor(plot_df$Sample_ID,levels=unique(plot_df$Sample_ID))
+plot_df$Genus <- factor(plot_df$Genus,levels=unique(plot_df$Genus))
+
+top_20_genera <- plot_df %>%
+  group_by(Genus) %>%                        # Group by Genus
+  summarise(Total_Abundance = sum(Abundance, na.rm = TRUE)) %>% # Sum abundance
+  arrange(desc(Total_Abundance)) %>%        # Sort by descending abundance
+  slice_head(n = 20) %>%                    # Select the top 20
+  pull(Genus)                               # Extract the Genus names
+
+top_20_genera
+
+filtered_df <- plot_df %>%
+  filter(Genus %in% top_20_genera)
+
+
+#filtered_df <- plot_df %>%  group_by(Genus) %>%   arrange(desc(Abundance)) %>%    slice_head(n = 20) %>%ungroup()
+
+unique(filtered_df$Genus)#shows that there are still 42 groups included
+
+#distance_labels <-c("0m", "0m", "65m", "980m", "2020m", "2230m")
+#label_map <- data.frame(
+ # Sample_ID = c("A-T-1","A-T-2","A-T-3","A-O-6","A-V-7","A-V-8"),
+ # distance_labels = c("0m", "0m", "65m", "980m", "2020m", "2230m"))
+
+
+#filtered_df<-merge(filtered_df,label_map, by="Sample_ID")
+
+
+ggplot(filtered_df,aes(x = factor(Sample_ID,levels=c("A-T-1","A-T-2","A-T-3","A-O-6","A-V-7","A-V-8")), y = Abundance, fill=(as.character(Genus))))+ 
+  geom_bar(stat="identity")+
+    guides(fill = guide_legend(ncol = 1))+
+   scale_fill_manual(values = custom_palette_Anne) +
+  labs(title="Top 20 Genera - Air Samples",fill="Genera",x="Sample ID")+
+theme(
+    legend.text = element_text(size = 5),  # Adjusts text size in the legend
+    legend.key.size = unit(0.25, "cm")) # Adjusts th
+```
+
+
+#Air- Genus
+```{r}
+# 
+# merged.r <- transform_sample_counts( merged, function(x) x / sum(x) * 100 )
+# bar_genus.r.t25 <- ps_plot_bar(merged.r, top=25, taxrank="Genus")
+# SaveVariousPlots( paste0(outfiles,"/",pjbase,"_BarPlots_genus_relative_top25"), bar_genus.r.t25, filetype=filetype)
+#Genus
+prevdf_air_genus <- tax_glom(prevdf_air,taxrank="Genus")
+
+plot_df <- psmelt(prevdf_air_genus)
+plot_df <- plot_df[,c("Abundance","Genus","Sample_ID")]
+plot_df$Sample_ID <- factor(plot_df$Sample_ID,levels=unique(plot_df$Sample_ID))
+plot_df$Genus <- factor(plot_df$Genus,levels=unique(plot_df$Genus))
+
+top_20_genera <- plot_df %>%
+  group_by(Genus) %>%                        # Group by Genus
+  summarise(Total_Abundance = sum(Abundance, na.rm = TRUE)) %>% # Sum abundance
+  arrange(desc(Total_Abundance)) %>%        # Sort by descending abundance
+  slice_head(n = 20) %>%                    # Select the top 20
+  pull(Genus)                               # Extract the Genus names
+
+top_20_genera
+
+filtered_df <- plot_df %>%
+  filter(Genus %in% top_20_genera)
+
+#filtered_df <- plot_df %>%  group_by(Genus) %>%   arrange(desc(Abundance)) %>%    slice_head(n = 20) %>%ungroup()
+
+unique(filtered_df$Genus)#shows that there are still 42 groups included
+
+#distance_labels <-c("0m", "0m", "65m", "980m", "2020m", "2230m")
+label_map <- data.frame(
+  Sample_ID = c("A-T-1","A-T-2","A-T-3","A-O-6","A-V-7","A-V-8"),
+  distance_labels = c("0m", "0m", "65m", "980m", "2020m", "2230m"))
+
+filtered_df<-merge(filtered_df,label_map, by="Sample_ID")
+
+ggplot(filtered_df,aes(x = factor(Sample_ID,levels=c("A-T-1","A-T-2","A-T-3","A-O-6","A-V-7","A-V-8")), y = Abundance, fill=(as.character(Genus))))+ 
+  geom_bar(stat="identity")+
+    guides(fill = guide_legend(ncol = 1))+
+   scale_fill_manual(values = custom_palette_Anne) +
+  labs(title="Top 20 Genera - Air Samples",fill="Genera",x="Sample ID")+
+theme(
+    legend.text = element_text(size = 5),  # Adjusts text size in the legend
+    legend.key.size = unit(0.25, "cm") ) # Adjusts the size of the legend key boxes
+
+#prevalence.plot <- ggplot(prevdf[!(as.numeric(prevdf$Phylum) %in% which(table(prevdf$Phylum)<5)),],
+ #                    aes(TotalAbundance, Prevalence, color = Phylum)) +
+  #                   geom_point(show.legend=F) +
+   #                  scale_x_log10() + xlab("Total Abundance") + ylab("Phylum prevalence") +
+    #                 facet_wrap(~Phylum) +
+     #                theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+#PCOA-air
+```{r}
+ps.r.ord <- ordinate( prevdf_air, method="PCoA", dist="bray" )
+ps.r.ord.p1 <- plot_ordination(prevdf_air, ps.r.ord, shape ="Sublocation", label="Sample_Number",color="Location")
+ps.r.ord.p1
+  #ord_plot(color = "Location", shape = "Distance_From_Stable (m)", size = 2) +
+  #scale_colour_brewer(palette = "Dark2")
+```
+
+
+#Water
+#Water- Phylum
+```{r}
+prevdf_water_phylum <- tax_glom(prevdf_water,taxrank="Phylum")
+
+plot_df <- psmelt(prevdf_water_phylum)
+plot_df <- plot_df[,c("Abundance","Phylum","Sample_ID")]
+plot_df$Sample_ID <- factor(plot_df$Sample_ID,levels=unique(plot_df$Sample_ID))
+plot_df$Phylum <- factor(plot_df$Phylum,levels=unique(plot_df$Phylum))
+
+top_20_Phyla <- plot_df %>%
+  group_by(Phylum) %>%                        # Group by Genus
+  summarise(Total_Abundance = sum(Abundance, na.rm = TRUE)) %>% # Sum abundance
+  arrange(desc(Total_Abundance)) %>%        # Sort by descending abundance
+  slice_head(n = 20) %>%                    # Select the top 20
+  pull(Phylum)                               # Extract the Genus names
+
+top_20_Phyla
+
+filtered_df <- plot_df %>%
+  filter(Phylum %in% top_20_Phyla)
+
+#filtered_df <- plot_df %>%  group_by(Sample_ID) %>%   arrange(desc(Abundance)) %>%    slice_head(n = 20) %>%ungroup()
+
+ggplot(filtered_df,aes(x = Sample_ID, y = Abundance, fill=(as.character(Phylum))))+ 
+  geom_bar(stat="identity")+
+    guides(fill = guide_legend(ncol = 1))+
+    labs(title="Top 20 Phyla - Water Samples",fill="Phyla")+
+   scale_fill_manual(values = custom_palette_Anne)+
+theme(
+    legend.text = element_text(size = 5),  # Adjusts text size in the legend
+    legend.key.size = unit(0.25, "cm") ) # Adjusts the size of the legend key boxes
+```
+#Water- Genus
+```{r}
+# 
+# merged.r <- transform_sample_counts( merged, function(x) x / sum(x) * 100 )
+# bar_genus.r.t25 <- ps_plot_bar(merged.r, top=25, taxrank="Genus")
+# SaveVariousPlots( paste0(outfiles,"/",pjbase,"_BarPlots_genus_relative_top25"), bar_genus.r.t25, filetype=filetype)
+#Genus
+prevdf_water_genus <- tax_glom(prevdf_water,taxrank="Genus")
+
+plot_df <- psmelt(prevdf_water_genus)
+plot_df <- plot_df[,c("Abundance","Genus","Sample_ID")]
+plot_df$Sample_ID <- factor(plot_df$Sample_ID,levels=unique(plot_df$Sample_ID))
+plot_df$Genus <- factor(plot_df$Genus,levels=unique(plot_df$Genus))
+
+top_20_genera <- plot_df %>%
+  group_by(Genus) %>%                        # Group by Genus
+  summarise(Total_Abundance = sum(Abundance, na.rm = TRUE)) %>% # Sum abundance
+  arrange(desc(Total_Abundance)) %>%        # Sort by descending abundance
+  slice_head(n = 20) %>%                    # Select the top 20
+  pull(Genus)                               # Extract the Genus names
+
+top_20_genera
+
+filtered_df <- plot_df %>%
+  filter(Genus %in% top_20_genera)
+
+#filtered_df <- plot_df %>%  group_by(Genus) %>%   arrange(desc(Abundance)) %>%    slice_head(n = 20) %>%ungroup()
+
+unique(filtered_df$Genus)#shows that there are still 42 groups included
+
+
+ggplot(filtered_df,aes(x = factor(Sample_ID, levels=c("W-O-12","W-O-12B","W-O-13","W-O-13B","W-V-15","W-V-15B","W-V-16","W-V-16 B","W-O-19","W-O-19B")), y = Abundance, fill=(as.character(Genus))))+ 
+  geom_bar(stat="identity")+
+       guides(fill = guide_legend(ncol = 1))+
+   scale_fill_manual(values = custom_palette_Anne) +
+  labs(title="Top 20 Genera - Water Samples",fill="Genera", x="Sample ID")+
+theme(
+    legend.text = element_text(size = 5),  # Adjusts text size in the legend
+    legend.key.size = unit(0.25, "cm") ) # Adjusts the size of the legend key boxes
+
+```
+
+#PCOA-water
+```{r}
+ps.r.ord <- ordinate( prevdf_water, method="PCoA", dist="bray" )
+ps.r.ord.p1 <- plot_ordination(prevdf_water, ps.r.ord, shape ="Sublocation", label="Sample_Number",color="Location")
+ps.r.ord.p1
+  #ord_plot(color = "Location", shape = "Distance_From_Stable (m)", size = 2) +
+  #scale_colour_brewer(palette = "Dark2")
+```
+```
+
