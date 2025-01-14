@@ -13,7 +13,8 @@ The project structure distinguishes three kinds of folders:
 - human-writeable (HW): edited by the researcher only.
 - project-generated (PG): folders generated when running the code; these folders can be deleted or emptied and will be completely reconstituted as the project is run.
 
-
+##Dependencies
+install R
 ```
 .
 ├── .gitignore
