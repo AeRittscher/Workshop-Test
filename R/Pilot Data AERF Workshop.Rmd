@@ -4,7 +4,7 @@ author: "AERF"
 date: "2024-11-22"
 output: html_document
 ---
-
+TEST TEST TEST
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, tidy = "styler")
 ```
@@ -12,11 +12,6 @@ knitr::opts_chunk$set(echo = TRUE, tidy = "styler")
 ## R Markdown
 #Libraries
 ```{r}
-if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager")
-}
-BiocManager::install("dada2", version = "3.20")
-
 library(readxl)
 BiocManager::install("ShortRead")
 BiocManager::install("Biostrings")
@@ -26,21 +21,21 @@ library(Biostrings)
 library(microViz)
 library(lintr)
 library(styler)
-# library(dada2) ; packageVersion('dada2')
+
 # others
 require(tidyverse)
 require(RColorBrewer)
-suppressWarnings(require(cowplot)) # suppress the new theme command change
-theme_set(theme_cowplot()) # since version 1.0 explicit setting required
+suppressWarnings(require(cowplot))
+theme_set(theme_cowplot())
 require(phyloseq)
 require(dada2)
 ```
 #lintr/styler practice 
 ```{r}
 # Linter checks for formatting issues
-lintr::lint("Pilot Data AERF Workshop.Rmd")
+# lintr::lint("Pilot Data AERF Workshop.Rmd")
 # Styler can automatically restyle you file without changing any functionality
-styler::style_file("Pilot Data AERF Workshop.Rmd")
+# styler::style_file("Pilot Data AERF Workshop.Rmd")
 ```
 
 #Custom Color Palette for plots
@@ -55,16 +50,10 @@ custom_palette_Anne <- c(
 ```
 #Load in Data
 ```{r}
-Pilot16S <- readRDS("20241018_AR_16S_silva_merged_NAfilled.rds")
+Pilot16S <- readRDS("../data/20241018_AR_16S_silva_merged_NAfilled.rds")
 ```
 #Phyloseq basics
 ```{r}
-## phyloseq-class experiment-level object
-## otu_table()   OTU Table:         [ 19216 taxa and 26 samples ]
-## sample_data() Sample Data:       [ 26 samples by 7 sample variables ]
-## tax_table()   Taxonomy Table:    [ 19216 taxa by 7 taxonomic ranks ]
-## phy_tree()    Phylogenetic Tree: [ 19216 tips and 19215 internal nodes ]
-
 ntaxa(Pilot16S)
 
 nsamples(Pilot16S)
@@ -76,13 +65,6 @@ rank_names(Pilot16S)
 sample_variables(Pilot16S)
 
 otu_table(Pilot16S)[1:5, 1:5]
-
-# tax_table(Pilot16S)[1:5, 1:4]
-
-# phy_tree(Pilot16S)
-# myTaxa = names(sort(taxa_sums(Pilot16S), decreasing = TRUE)[1:10])
-# ex1 = prune_taxa(myTaxa, Pilot16S)
-# plot(phy_tree(ex1), show.node.label = TRUE)
 ```
 #Merge with Metadata
 ```{r}
@@ -90,7 +72,7 @@ Pilot16S@sam_data
 sample_names(Pilot16S)
 # renaming samples
 # load metadata file
-metaPilot <- read_excel("NCOH-PP Pilot Sample Master List.xlsx", sheet = "Sample Master List")
+metaPilot <- read_excel("../data/NCOH-PP Pilot Sample Master List.xlsx", sheet = "Sample Master List")
 
 # remove non sequenced samples
 metaPilot <- subset(metaPilot, metaPilot$Seq_ID != "Not Sequenced")
@@ -107,7 +89,7 @@ sample_data(Pilot16S) <- metaPilot
 #Merge with 16S qPCR
 ```{r}
 # Load 16S Data
-qPCR16SPilot <- read_excel("NCOH-PP Pilot Sample Master List.xlsx", sheet = "16S qPCR")
+qPCR16SPilot <- read_excel("../data/NCOH-PP Pilot Sample Master List.xlsx", sheet = "16S qPCR")
 
 # remove non sequenced samples
 qPCR16SPilot <- subset(qPCR16SPilot, qPCR16SPilot$Seq_ID != "Not Sequenced")
@@ -125,14 +107,6 @@ head(Pilot16S@sam_data)
 #Split Data by Sample Type
 ###Air
 ```{r}
-# Split_by_Sample_Type<-function(dataframe,col_name) {
-# air_dataset<- subset_samples(dataframe,col_name == ("Air Filter"))
-# water_dataset<-
-#  subset_samples(dataframe, col_name == "Water")
-#  return(c(air_dataset,water_dataset))}
-
-# Split_by_Sample_Type(Pilot16S,col_name = Sample_Type)
-
 # Air
 Pilot16S_air <- subset_samples(Pilot16S, Sample_Type %in% c("Air Filter", "Air Filter-Blank"))
 
@@ -141,15 +115,10 @@ Pilot16S_air <- subset_samples(Pilot16S, Sample_Type %in% c("Air Filter", "Air F
 
 # Water
 Pilot16S_water <- subset_samples(Pilot16S, Sample_Type == "Water")
-# |#Air_composition <- create_ordered_bar(subset_samples(Pilot16S, !is.na(population)), "Air Filter", 15) +
-#   #theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
-#   geom_bar(stat = "identity", width = 1) +
-#   facet_wrap(~population, scale = "free")
 ```
 
 ```{r}
 # create realtive abundance object
-
 prevdf_air <- transformSampleCounts(Pilot16S_air, function(x) 1E2 * x / sum(x))
 prevdf_water <- transformSampleCounts(Pilot16S_water, function(x) 1E2 * x / sum(x))
 ```
@@ -176,15 +145,6 @@ top_20_Phyla
 # filtered_df <- plot_df %>%  group_by(Sample_ID) %>%   arrange(desc(Abundance)) %>%    slice_head(n = 20) %>%ungroup()
 
 # unique(filtered_df$Phylum)#shows that there are still 48 groups included
-
-# ggplot(filtered_df,aes(x = Sample_ID, y = Abundance, fill=(as.character(Phylum))))+
-# geom_bar(stat="identity")+
-#  guides(fill = guide_legend(ncol = 1))+
-# scale_fill_manual(values = custom_palette_Anne) +
-# labs(title="Top 20 Phyla - Air Samples",fill="Phyla")+
-# theme(
-#   legend.text = element_text(size = 5),  # Adjusts text size in the legend
-#  legend.key.size = unit(0.25, "cm") ) # Adjusts the size of the legend key boxes
 ```
 #Removing possible contaminate genera
 ```{r}
@@ -234,13 +194,7 @@ filtered_df <- plot_df %>%
 
 unique(filtered_df$Genus) # shows that there are still 42 groups included
 
-# distance_labels <-c("0m", "0m", "65m", "980m", "2020m", "2230m")
-# label_map <- data.frame(
-# Sample_ID = c("A-T-1","A-T-2","A-T-3","A-O-6","A-V-7","A-V-8"),
-# distance_labels = c("0m", "0m", "65m", "980m", "2020m", "2230m"))
 
-
-# filtered_df<-merge(filtered_df,label_map, by="Sample_ID")
 
 
 ggplot(filtered_df, aes(x = factor(Sample_ID, levels = c("A-T-1", "A-T-2", "A-T-3", "A-O-6", "A-V-7", "A-V-8")), y = Abundance, fill = (as.character(Genus)))) +
@@ -257,11 +211,6 @@ ggplot(filtered_df, aes(x = factor(Sample_ID, levels = c("A-T-1", "A-T-2", "A-T-
 
 #Air- Genus
 ```{r}
-#
-# merged.r <- transform_sample_counts( merged, function(x) x / sum(x) * 100 )
-# bar_genus.r.t25 <- ps_plot_bar(merged.r, top=25, taxrank="Genus")
-# SaveVariousPlots( paste0(outfiles,"/",pjbase,"_BarPlots_genus_relative_top25"), bar_genus.r.t25, filetype=filetype)
-# Genus
 prevdf_air_genus <- tax_glom(prevdf_air, taxrank = "Genus")
 
 plot_df <- psmelt(prevdf_air_genus)
@@ -302,13 +251,6 @@ ggplot(filtered_df, aes(x = factor(Sample_ID, levels = c("A-T-1", "A-T-2", "A-T-
     legend.text = element_text(size = 5), # Adjusts text size in the legend
     legend.key.size = unit(0.25, "cm")
   ) # Adjusts the size of the legend key boxes
-
-# prevalence.plot <- ggplot(prevdf[!(as.numeric(prevdf$Phylum) %in% which(table(prevdf$Phylum)<5)),],
-#                    aes(TotalAbundance, Prevalence, color = Phylum)) +
-#                   geom_point(show.legend=F) +
-#                  scale_x_log10() + xlab("Total Abundance") + ylab("Phylum prevalence") +
-#                 facet_wrap(~Phylum) +
-#                theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 #PCOA-air
 ```{r}
@@ -356,10 +298,6 @@ ggplot(filtered_df, aes(x = Sample_ID, y = Abundance, fill = (as.character(Phylu
 ```
 #Water- Genus
 ```{r}
-#
-# merged.r <- transform_sample_counts( merged, function(x) x / sum(x) * 100 )
-# bar_genus.r.t25 <- ps_plot_bar(merged.r, top=25, taxrank="Genus")
-# SaveVariousPlots( paste0(outfiles,"/",pjbase,"_BarPlots_genus_relative_top25"), bar_genus.r.t25, filetype=filetype)
 # Genus
 prevdf_water_genus <- tax_glom(prevdf_water, taxrank = "Genus")
 
@@ -380,8 +318,6 @@ top_20_genera
 filtered_df <- plot_df %>%
   filter(Genus %in% top_20_genera)
 
-# filtered_df <- plot_df %>%  group_by(Genus) %>%   arrange(desc(Abundance)) %>%    slice_head(n = 20) %>%ungroup()
-
 unique(filtered_df$Genus) # shows that there are still 42 groups included
 
 
@@ -398,9 +334,9 @@ ggplot(filtered_df, aes(x = factor(Sample_ID, levels = c("W-O-12", "W-O-12B", "W
 
 #PCOA-water
 ```{r}
-ps.r.ord <- ordinate(prevdf_water, method = "PCoA", dist = "bray")
-ps.r.ord.p1 <- plot_ordination(prevdf_water, ps.r.ord, shape = "Sublocation", label = "Sample_Number", color = "Location")
-ps.r.ord.p1
+ps_r_ord <- ordinate(prevdf_water, method = "PCoA", dist = "bray")
+ps_r_ord.p1 <- plot_ordination(prevdf_water, ps_r_ord, shape = "Sublocation", label = "Sample_Number", color = "Location")
+ps_r_ord_p1
 # ord_plot(color = "Location", shape = "Distance_From_Stable (m)", size = 2) +
 # scale_colour_brewer(palette = "Dark2")
 ```
