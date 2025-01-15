@@ -110,9 +110,6 @@ head(Pilot16S@sam_data)
 # Air
 Pilot16S_air <- subset_samples(Pilot16S, Sample_Type %in% c("Air Filter", "Air Filter-Blank"))
 
-
-# plot_bar(Pilot16S_air,fill="Phylum")
-
 # Water
 Pilot16S_water <- subset_samples(Pilot16S, Sample_Type == "Water")
 ```
@@ -142,9 +139,6 @@ top_20_Phyla <- plot_df %>%
 
 top_20_Phyla
 
-# filtered_df <- plot_df %>%  group_by(Sample_ID) %>%   arrange(desc(Abundance)) %>%    slice_head(n = 20) %>%ungroup()
-
-# unique(filtered_df$Phylum)#shows that there are still 48 groups included
 ```
 #Removing possible contaminate genera
 ```{r}
@@ -205,10 +199,8 @@ ggplot(filtered_df, aes(x = factor(Sample_ID, levels = c("A-T-1", "A-T-2", "A-T-
   theme(
     legend.text = element_text(size = 5), # Adjusts text size in the legend
     legend.key.size = unit(0.25, "cm")
-  ) # Adjusts th
+  )
 ```
-
-
 #Air- Genus
 ```{r}
 prevdf_air_genus <- tax_glom(prevdf_air, taxrank = "Genus")
@@ -335,7 +327,7 @@ ggplot(filtered_df, aes(x = factor(Sample_ID, levels = c("W-O-12", "W-O-12B", "W
 #PCOA-water
 ```{r}
 ps_r_ord <- ordinate(prevdf_water, method = "PCoA", dist = "bray")
-ps_r_ord.p1 <- plot_ordination(prevdf_water, ps_r_ord, shape = "Sublocation", label = "Sample_Number", color = "Location")
+ps_r_ord_p1 <- plot_ordination(prevdf_water, ps_r_ord, shape = "Sublocation", label = "Sample_Number", color = "Location")
 ps_r_ord_p1
 # ord_plot(color = "Location", shape = "Distance_From_Stable (m)", size = 2) +
 # scale_colour_brewer(palette = "Dark2")
